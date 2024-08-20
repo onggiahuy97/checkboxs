@@ -26,7 +26,20 @@ var (
 func main() {
 	fmt.Println("Starting server on :8080")
 	http.HandleFunc("/ws", handler)
+	http.HandleFunc("/grid", getGrid)
 	http.ListenAndServe(":8080", nil)
+}
+
+func getGrid(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")    // Adjust this for CORS if necessary
+	w.Header().Set("Access-Control-Allow-Methods", "GET") // Adjust this for CORS if necessary
+
+	err := json.NewEncoder(w).Encode(grid)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
@@ -41,7 +54,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	clients = append(clients, ws)
 	clientsMu.Unlock()
 
-	go sendPings(ws)
+	// go sendPings(ws)
 
 	for {
 		_, msg, err := ws.ReadMessage()
@@ -72,18 +85,26 @@ func sendGridToAllClients() {
 	clientsMu.Lock()
 	defer clientsMu.Unlock()
 
-	gridJSON, err := json.Marshal(grid)
-	if err != nil {
-		fmt.Println("Marshal error:", err)
-		return
-	}
+	// gridJSON, err := json.Marshal(grid)
+	// if err != nil {
+	// 	fmt.Println("Marshal error:", err)
+	// 	return
+	// }
 
+	notification := []byte("updated")
 	for _, client := range clients {
-		err := client.WriteMessage(websocket.TextMessage, gridJSON)
+		//err := client.WriteMessage(websocket.TextMessage, gridJSON)
+		err := client.WriteMessage(websocket.TextMessage, notification)
 		if err != nil {
 			fmt.Println("WriteMessage error:", err)
 			removeClient(client)
 		}
+
+		err = client.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseGoingAway, "Server is shutting down"))
+		if err != nil {
+			fmt.Println("Erro closing Websocket connection: ", err)
+		}
+		client.Close()
 	}
 }
 
