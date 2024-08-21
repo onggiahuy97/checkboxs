@@ -34,8 +34,11 @@ export default function Home() {
         };
 
         ws.onclose = () => {
-            console.log('WebSocket connection closed, attempting to reconnect...');
-            setTimeout(connectWebSocket, 1000); // Attempt to reconnect after 1 second
+            console.log('WebSocket closed. Reconnect will be attempted in 1 second.')
+            // Reconect after 1 second
+            setTimeout(() => {
+                connectWebSocket();
+            }, 1000);
         };
 
         ws.onerror = (error) => {
