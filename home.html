@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grid Checkboxes</title>
+    <style>
+        body {
+            background-color: black;
+            color: white;
+        }
+        .flex {
+            display: flex;
+        }
+        .justify-center {
+            justify-content: center;
+        }
+        .items-center {
+            align-items: center;
+        }
+        .h-screen {
+            height: 100vh;
+        }
+        .grid {
+            display: grid;
+            gap: 0.5rem;
+        }
+        .h-8 {
+            height: 2rem;
+        }
+        .w-8 {
+            width: 2rem;
+        }
+        .mr-2 {
+            margin-right: 0.5rem;
+        }
+    </style>
+    </head>
+    <body>
+
+        <div class="flex justify-center items-center h-screen">
+            <div class="grid" id="grid-container" style="grid-template-columns: repeat(15, minmax(0, 1fr));">
+                <!-- Grid checkboxes will be dynamically inserted here -->
+            </div>
+        </div>
+
+        <script>
+
+
+        document.addEventListener('DOMContentLoaded', function() {
+            let grid = Array.from({ length: 15 }, () => Array(15).fill(false));
+
+            const gridContainer = document.getElementById('grid-container');
+
+            fetch("http://" + window.location.host + "/grid")
+                .then((response) => response.json())
+                .then((data) => {
+                    grid = data;
+                    renderGrid();
+                })
+                .catch((error) => {
+                    console.log("error fetching initial grid state: ", error);
+                });
+
+            const renderGrid = () => {
+                gridContainer.innerHTML = '';
+                grid.forEach((row, rowIndex) => {
+                    row.forEach((checked, colIndex) => {
+                        const div = document.createElement('div');
+                        div.className = 'flex items-center';
+
+                        const input = document.createElement('input');
+                        input.type = 'checkbox';
+                        input.className = 'h-8 w-8 mr-2';
+                        input.checked = checked;
+                        input.addEventListener('change', () => handleCheckboxChange(rowIndex, colIndex));
+
+                        div.appendChild(input);
+                        gridContainer.appendChild(div);
+                    });
+                });
+            };
+
+            let conn;
+
+            if (window["WebSocket"]) {
+                conn = new WebSocket("ws://" + document.location.host + "/ws");
+
+                conn.onopen = function () {
+                    console.log("WebSocket connection established");
+                    renderGrid();
+                };
+
+                conn.onclose = function () {
+                    console.log("Connection is closed. Reconnecting...");
+                    setTimeout(function() {
+                        // Attempt to reconnect after 1 second
+                        conn = new WebSocket("ws://" + document.location.host + "/ws");
+                    }, 1000);
+                };
+
+                conn.onmessage = (event) => {
+                    try {
+                        // Parse the received message
+                        const index = JSON.parse(event.data);
+
+                        // Ensure the received data has valid `Row` and `Col` properties
+                        if (typeof index.Row === 'number' && typeof index.Col === 'number') {
+                            // Update the grid with the received index
+                            grid[index.Row][index.Col] = !grid[index.Row][index.Col];
+                            renderGrid();  // Re-render the grid with the updated state
+                        } else {
+                            console.error('Invalid data received:', index);
+                        }
+                    } catch (error) {
+                        console.error('Error parsing message from server:', error);
+                    }
+                };
+
+                conn.onerror = function (error) {
+                    console.error('WebSocket error:', error);
+                };
+            }
+
+            const handleCheckboxChange = (row, col) => {
+                if (conn && conn.readyState === WebSocket.OPEN) {
+                    conn.send(JSON.stringify({ Row: row, Col: col }));
+                } else {
+                    console.log('WebSocket is not open. Cannot send message.');
+                }
+            };
+
+
+            renderGrid();
+        });
+</script>
+
+</body>
+</html>
+
